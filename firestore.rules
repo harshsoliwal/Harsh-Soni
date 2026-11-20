@@ -1,0 +1,973 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // PILLAR 1: GLOBAL SAFETY NET (Default Deny Catch-All)
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // PILLAR 3: PRIMITIVES & IDENTITY HELPERS
+    // =========================================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'harshsoliwal@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalString(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalNumber(data, key) {
+      return !(key in data) || (data[key] is number);
+    }
+
+    function isValidStaffList(arr) {
+      return arr is list && arr.size() <= 10 && (arr.size() == 0 || arr[0] is string);
+    }
+
+    function isValidTimestamp(val) {
+      return val is timestamp;
+    }
+
+    // =========================================================================
+    // PILLAR 2: VALIDATION BLUEPRINTS (isValid[Entity])
+    // =========================================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'isActive', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'phone', 'role', 'supplierId', 'isActive', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && isValidString(data.email, 3, 200)
+        && isValidString(data.displayName, 1, 120)
+        && isOptionalString(data, 'phone', 24)
+        && isOptionalString(data, 'supplierId', 128)
+        && data.role in ['jeweller', 'supplier', 'supplier_staff', 'super_admin']
+        && data.isActive is bool
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAdminDoc(data) {
+      return data.keys().hasAll(['uid', 'email', 'grantedBy', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'grantedBy', 'createdAt'])
+        && isValidId(data.uid)
+        && isValidString(data.email, 3, 200)
+        && isValidId(data.grantedBy)
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function isValidJewellerProfile(data) {
+      return data.keys().hasAll(['userId', 'shopName', 'ownerName', 'gstin', 'jaipurLocality', 'verificationStatus', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'shopName', 'ownerName', 'gstin', 'pan', 'jaipurLocality', 'address', 'contactPhone', 'kycDocumentUrl', 'kycDocumentName', 'verificationStatus', 'createdAt', 'updatedAt'])
+        && isValidId(data.userId)
+        && isValidString(data.shopName, 2, 140)
+        && isValidString(data.ownerName, 2, 120)
+        && isValidString(data.gstin, 5, 20)
+        && isOptionalString(data, 'pan', 16)
+        && isValidString(data.jaipurLocality, 2, 80)
+        && isOptionalString(data, 'address', 300)
+        && isOptionalString(data, 'contactPhone', 24)
+        && isOptionalString(data, 'kycDocumentUrl', 600)
+        && isOptionalString(data, 'kycDocumentName', 160)
+        && data.verificationStatus in ['Pending', 'Under Review', 'Approved', 'Rejected']
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSupplier(data) {
+      return data.keys().hasAll(['ownerUserId', 'businessName', 'gstin', 'bisLicenseNumber', 'jaipurLocality', 'officeAddress', 'deliveryCenter', 'status', 'ratingAvg', 'reviewCount', 'completedOrdersCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerUserId', 'businessName', 'gstin', 'bisLicenseNumber', 'assayingPartner', 'jaipurLocality', 'officeAddress', 'deliveryCenter', 'kycDocumentUrl', 'kycDocumentName', 'status', 'adminRemarks', 'ratingAvg', 'reviewCount', 'completedOrdersCount', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerUserId)
+        && isValidString(data.businessName, 2, 140)
+        && isValidString(data.gstin, 5, 20)
+        && isValidString(data.bisLicenseNumber, 2, 80)
+        && isOptionalString(data, 'assayingPartner', 140)
+        && isValidString(data.jaipurLocality, 2, 80)
+        && isValidString(data.officeAddress, 4, 300)
+        && isValidString(data.deliveryCenter, 2, 200)
+        && isOptionalString(data, 'kycDocumentUrl', 600)
+        && isOptionalString(data, 'kycDocumentName', 160)
+        && data.status in ['Pending', 'Under Review', 'Approved', 'Rejected', 'Suspended']
+        && isOptionalString(data, 'adminRemarks', 400)
+        && data.ratingAvg is number && data.ratingAvg >= 0 && data.ratingAvg <= 5
+        && data.reviewCount is number && data.reviewCount >= 0
+        && data.completedOrdersCount is number && data.completedOrdersCount >= 0
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSupplierStaff(data) {
+      return data.keys().hasAll(['supplierId', 'supplierOwnerId', 'staffEmail', 'staffName', 'canLockRates', 'canUploadPurityDocs', 'isActive', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['supplierId', 'supplierOwnerId', 'userId', 'staffEmail', 'staffName', 'designation', 'canLockRates', 'canUploadPurityDocs', 'isActive', 'createdAt', 'updatedAt'])
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierOwnerId)
+        && isOptionalString(data, 'userId', 128)
+        && isValidString(data.staffEmail, 3, 200)
+        && isValidString(data.staffName, 2, 120)
+        && isOptionalString(data, 'designation', 80)
+        && data.canLockRates is bool
+        && data.canUploadPurityDocs is bool
+        && data.isActive is bool
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidMarketRate(data) {
+      return data.keys().hasAll(['gold999Per10g', 'gold995Per10g', 'gold999Per1g', 'silver999Per1kg', 'silver999Per100g', 'source', 'isDelayed', 'isManualOverride', 'lastUpdatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['gold999Per10g', 'gold995Per10g', 'gold999Per1g', 'silver999Per1kg', 'silver999Per100g', 'usdInr', 'xauUsd', 'xagUsd', 'source', 'isDelayed', 'isManualOverride', 'manualOverrideNote', 'lastUpdatedAt', 'updatedBy'])
+        && data.gold999Per10g is number && data.gold999Per10g >= 10000 && data.gold999Per10g <= 500000
+        && data.gold995Per10g is number && data.gold995Per10g >= 10000 && data.gold995Per10g <= 500000
+        && data.gold999Per1g is number && data.gold999Per1g >= 1000 && data.gold999Per1g <= 50000
+        && data.silver999Per1kg is number && data.silver999Per1kg >= 10000 && data.silver999Per1kg <= 500000
+        && data.silver999Per100g is number && data.silver999Per100g >= 1000 && data.silver999Per100g <= 50000
+        && isOptionalNumber(data, 'usdInr')
+        && isOptionalNumber(data, 'xauUsd')
+        && isOptionalNumber(data, 'xagUsd')
+        && isValidString(data.source, 2, 120)
+        && data.isDelayed is bool
+        && data.isManualOverride is bool
+        && isOptionalString(data, 'manualOverrideNote', 240)
+        && isValidTimestamp(data.lastUpdatedAt)
+        && isValidString(data.updatedBy, 1, 128);
+    }
+
+    function isValidBullionListing(data) {
+      return data.keys().hasAll(['supplierId', 'supplierOwnerId', 'supplierName', 'supplierApproved', 'metal', 'purity', 'form', 'title', 'unitGrams', 'minWeightGrams', 'maxWeightGrams', 'availableStockGrams', 'premiumPerUnitInr', 'jaipurLocality', 'deliveryCenter', 'supportsBuy', 'supportsSell', 'supportsExchange', 'isActive', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['supplierId', 'supplierOwnerId', 'supplierName', 'supplierApproved', 'metal', 'purity', 'form', 'title', 'unitGrams', 'minWeightGrams', 'maxWeightGrams', 'availableStockGrams', 'premiumPerUnitInr', 'jaipurLocality', 'deliveryCenter', 'supportsBuy', 'supportsSell', 'supportsExchange', 'isActive', 'createdAt', 'updatedAt'])
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierOwnerId)
+        && isValidString(data.supplierName, 2, 140)
+        && data.supplierApproved is bool
+        && data.metal in ['GOLD', 'SILVER']
+        && data.purity in ['999', '995']
+        && data.form in ['Bar', 'Coin', 'Biscuit', 'Kacha']
+        && isValidString(data.title, 3, 140)
+        && data.unitGrams is number && data.unitGrams > 0
+        && data.minWeightGrams is number && data.minWeightGrams > 0
+        && data.maxWeightGrams is number && data.maxWeightGrams >= data.minWeightGrams
+        && data.availableStockGrams is number && data.availableStockGrams >= 0
+        && data.premiumPerUnitInr is number && data.premiumPerUnitInr >= -5000 && data.premiumPerUnitInr <= 50000
+        && isValidString(data.jaipurLocality, 2, 80)
+        && isValidString(data.deliveryCenter, 2, 200)
+        && data.supportsBuy is bool
+        && data.supportsSell is bool
+        && data.supportsExchange is bool
+        && data.isActive is bool
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['orderNumber', 'idempotencyKey', 'jewellerId', 'jewellerShopName', 'supplierId', 'supplierOwnerId', 'supplierName', 'listingId', 'assignedStaffUids', 'orderType', 'metal', 'purity', 'weightGrams', 'deliveryCenter', 'status', 'isRateLocked', 'indicativeMcxRatePerUnit', 'supplierPremiumPerUnitInr', 'platformCommissionRatePct', 'gstRatePct', 'hasInvoice', 'hasReview', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['orderNumber', 'idempotencyKey', 'jewellerId', 'jewellerShopName', 'supplierId', 'supplierOwnerId', 'supplierName', 'listingId', 'assignedStaffUids', 'orderType', 'metal', 'purity', 'weightGrams', 'deliveryCenter', 'notes', 'status', 'isRateLocked', 'indicativeMcxRatePerUnit', 'supplierPremiumPerUnitInr', 'platformCommissionRatePct', 'gstRatePct', 'lockedMcxBaseRatePerUnit', 'baseMetalValueInr', 'supplierPremiumTotalInr', 'grossBullionValueInr', 'platformCommissionInr', 'gstAmountInr', 'finalPayableTotalInr', 'rateLockedAt', 'rateLockedByUid', 'settlementMethod', 'settlementReference', 'rejectionReason', 'hasInvoice', 'hasReview', 'createdAt', 'updatedAt'])
+        && isValidString(data.orderNumber, 6, 40)
+        && isValidId(data.idempotencyKey)
+        && isValidId(data.jewellerId)
+        && isValidString(data.jewellerShopName, 2, 140)
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierOwnerId)
+        && isValidString(data.supplierName, 2, 140)
+        && isValidId(data.listingId)
+        && isValidStaffList(data.assignedStaffUids)
+        && data.orderType in ['BUY', 'SELL', 'EXCHANGE']
+        && data.metal in ['GOLD', 'SILVER']
+        && data.purity in ['999', '995']
+        && data.weightGrams is number && data.weightGrams > 0 && data.weightGrams <= 1000000
+        && isValidString(data.deliveryCenter, 2, 200)
+        && isOptionalString(data, 'notes', 500)
+        && data.status in ['Quote Requested', 'Quote Confirmed & Rate Locked', 'Rejected', 'Purity & Docs Uploaded', 'Order Approved by Jeweller', 'Payment / Exchange Settled', 'Ready for Pickup / Dispatch', 'Completed', 'Cancelled']
+        && data.isRateLocked is bool
+        && data.indicativeMcxRatePerUnit is number && data.indicativeMcxRatePerUnit > 0
+        && data.supplierPremiumPerUnitInr is number
+        && data.platformCommissionRatePct is number && data.platformCommissionRatePct >= 0 && data.platformCommissionRatePct <= 10
+        && data.gstRatePct is number && data.gstRatePct >= 0 && data.gstRatePct <= 28
+        && isOptionalNumber(data, 'lockedMcxBaseRatePerUnit')
+        && isOptionalNumber(data, 'baseMetalValueInr')
+        && isOptionalNumber(data, 'supplierPremiumTotalInr')
+        && isOptionalNumber(data, 'grossBullionValueInr')
+        && isOptionalNumber(data, 'platformCommissionInr')
+        && isOptionalNumber(data, 'gstAmountInr')
+        && isOptionalNumber(data, 'finalPayableTotalInr')
+        && (!('rateLockedAt' in data) || isValidTimestamp(data.rateLockedAt))
+        && isOptionalString(data, 'rateLockedByUid', 128)
+        && isOptionalString(data, 'settlementMethod', 60)
+        && isOptionalString(data, 'settlementReference', 120)
+        && isOptionalString(data, 'rejectionReason', 300)
+        && data.hasInvoice is bool
+        && data.hasReview is bool
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidOrderStatusHistory(data) {
+      return data.keys().hasAll(['orderId', 'jewellerId', 'supplierOwnerId', 'assignedStaffUids', 'fromStatus', 'toStatus', 'changedByUid', 'changedByRole', 'note', 'createdAt'])
+        && data.keys().hasOnly(['orderId', 'jewellerId', 'supplierOwnerId', 'assignedStaffUids', 'fromStatus', 'toStatus', 'changedByUid', 'changedByRole', 'note', 'priceSnapshotInr', 'createdAt'])
+        && isValidId(data.orderId)
+        && isValidId(data.jewellerId)
+        && isValidId(data.supplierOwnerId)
+        && isValidStaffList(data.assignedStaffUids)
+        && isValidString(data.fromStatus, 1, 60)
+        && isValidString(data.toStatus, 1, 60)
+        && isValidId(data.changedByUid)
+        && data.changedByUid == request.auth.uid
+        && isValidString(data.changedByRole, 2, 40)
+        && isValidString(data.note, 1, 400)
+        && isOptionalNumber(data, 'priceSnapshotInr')
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function isValidPurityDocument(data) {
+      return data.keys().hasAll(['orderId', 'jewellerId', 'supplierId', 'supplierOwnerId', 'assignedStaffUids', 'certificateNumber', 'assayingLab', 'testedPurity', 'grossWeightGrams', 'netWeightGrams', 'fileName', 'uploadedByUid', 'createdAt'])
+        && data.keys().hasOnly(['orderId', 'jewellerId', 'supplierId', 'supplierOwnerId', 'assignedStaffUids', 'certificateNumber', 'assayingLab', 'testedPurity', 'grossWeightGrams', 'netWeightGrams', 'fileUrl', 'fileName', 'uploadedByUid', 'createdAt'])
+        && isValidId(data.orderId)
+        && isValidId(data.jewellerId)
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierOwnerId)
+        && isValidStaffList(data.assignedStaffUids)
+        && isValidString(data.certificateNumber, 3, 80)
+        && isValidString(data.assayingLab, 2, 140)
+        && isValidString(data.testedPurity, 2, 40)
+        && data.grossWeightGrams is number && data.grossWeightGrams > 0
+        && data.netWeightGrams is number && data.netWeightGrams > 0
+        && isOptionalString(data, 'fileUrl', 600)
+        && isValidString(data.fileName, 1, 160)
+        && isValidId(data.uploadedByUid)
+        && data.uploadedByUid == request.auth.uid
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function isValidInvoice(data) {
+      return data.keys().hasAll(['orderId', 'invoiceNumber', 'jewellerId', 'jewellerShopName', 'supplierId', 'supplierOwnerId', 'supplierName', 'assignedStaffUids', 'metal', 'purity', 'weightGrams', 'grossBullionValueInr', 'platformCommissionRatePct', 'platformCommissionInr', 'gstRatePct', 'gstAmountInr', 'finalPayableTotalInr', 'issuedByUid', 'issuedAt'])
+        && data.keys().hasOnly(['orderId', 'invoiceNumber', 'jewellerId', 'jewellerShopName', 'supplierId', 'supplierOwnerId', 'supplierName', 'assignedStaffUids', 'metal', 'purity', 'weightGrams', 'grossBullionValueInr', 'platformCommissionRatePct', 'platformCommissionInr', 'gstRatePct', 'gstAmountInr', 'finalPayableTotalInr', 'issuedByUid', 'issuedAt'])
+        && isValidId(data.orderId)
+        && isValidString(data.invoiceNumber, 6, 50)
+        && isValidId(data.jewellerId)
+        && isValidString(data.jewellerShopName, 2, 140)
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierOwnerId)
+        && isValidString(data.supplierName, 2, 140)
+        && isValidStaffList(data.assignedStaffUids)
+        && data.metal in ['GOLD', 'SILVER']
+        && data.purity in ['999', '995']
+        && data.weightGrams is number && data.weightGrams > 0
+        && data.grossBullionValueInr is number && data.grossBullionValueInr > 0
+        && data.platformCommissionRatePct is number && data.platformCommissionRatePct >= 0
+        && data.platformCommissionInr is number && data.platformCommissionInr >= 0
+        && data.gstRatePct is number && data.gstRatePct >= 0
+        && data.gstAmountInr is number && data.gstAmountInr >= 0
+        && data.finalPayableTotalInr is number && data.finalPayableTotalInr > 0
+        && isValidId(data.issuedByUid)
+        && data.issuedByUid == request.auth.uid
+        && isValidTimestamp(data.issuedAt);
+    }
+
+    function isValidReview(data) {
+      return data.keys().hasAll(['orderId', 'jewellerId', 'jewellerShopName', 'supplierId', 'rating', 'comment', 'createdAt'])
+        && data.keys().hasOnly(['orderId', 'jewellerId', 'jewellerShopName', 'supplierId', 'rating', 'comment', 'createdAt'])
+        && isValidId(data.orderId)
+        && isValidId(data.jewellerId)
+        && data.jewellerId == request.auth.uid
+        && isValidString(data.jewellerShopName, 2, 140)
+        && isValidId(data.supplierId)
+        && data.rating is number && data.rating >= 1 && data.rating <= 5
+        && isValidString(data.comment, 4, 600)
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['userId', 'senderUid', 'title', 'message', 'category', 'isRead', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'senderUid', 'title', 'message', 'category', 'relatedOrderId', 'isRead', 'createdAt'])
+        && isValidId(data.userId)
+        && isValidId(data.senderUid)
+        && isValidString(data.title, 2, 140)
+        && isValidString(data.message, 2, 400)
+        && data.category in ['ORDER', 'RATE_LOCK', 'VERIFICATION', 'SUPPORT', 'SETTLEMENT']
+        && isOptionalString(data, 'relatedOrderId', 128)
+        && data.isRead is bool
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function isValidSupportTicket(data) {
+      return data.keys().hasAll(['ticketNumber', 'createdByUid', 'createdByName', 'createdByRole', 'subject', 'category', 'priority', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ticketNumber', 'createdByUid', 'createdByName', 'createdByRole', 'subject', 'category', 'priority', 'status', 'relatedOrderId', 'createdAt', 'updatedAt'])
+        && isValidString(data.ticketNumber, 5, 40)
+        && isValidId(data.createdByUid)
+        && isValidString(data.createdByName, 2, 120)
+        && isValidString(data.createdByRole, 2, 40)
+        && isValidString(data.subject, 3, 160)
+        && data.category in ['Order Issue', 'Purity Dispute', 'KYC / Verification', 'Settlement / Invoice', 'General']
+        && data.priority in ['Low', 'Medium', 'High']
+        && data.status in ['Open', 'In Progress', 'Resolved', 'Closed']
+        && isOptionalString(data, 'relatedOrderId', 128)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidSupportMessage(data) {
+      return data.keys().hasAll(['ticketId', 'ticketOwnerId', 'senderUid', 'senderName', 'senderRole', 'body', 'isInternalNote', 'createdAt'])
+        && data.keys().hasOnly(['ticketId', 'ticketOwnerId', 'senderUid', 'senderName', 'senderRole', 'body', 'isInternalNote', 'createdAt'])
+        && isValidId(data.ticketId)
+        && isValidId(data.ticketOwnerId)
+        && isValidId(data.senderUid)
+        && data.senderUid == request.auth.uid
+        && isValidString(data.senderName, 2, 120)
+        && isValidString(data.senderRole, 2, 40)
+        && isValidString(data.body, 1, 1500)
+        && data.isInternalNote is bool
+        && isValidTimestamp(data.createdAt);
+    }
+
+    function isValidSettlement(data) {
+      return data.keys().hasAll(['orderId', 'orderNumber', 'supplierId', 'supplierOwnerId', 'supplierName', 'grossTransactionValueInr', 'platformCommissionRatePct', 'platformCommissionInr', 'supplierNetPayableInr', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['orderId', 'orderNumber', 'supplierId', 'supplierOwnerId', 'supplierName', 'grossTransactionValueInr', 'platformCommissionRatePct', 'platformCommissionInr', 'supplierNetPayableInr', 'status', 'referenceNumber', 'createdAt', 'updatedAt'])
+        && isValidId(data.orderId)
+        && isValidString(data.orderNumber, 6, 40)
+        && isValidId(data.supplierId)
+        && isValidId(data.supplierOwnerId)
+        && isValidString(data.supplierName, 2, 140)
+        && data.grossTransactionValueInr is number && data.grossTransactionValueInr > 0
+        && data.platformCommissionRatePct is number && data.platformCommissionRatePct >= 0
+        && data.platformCommissionInr is number && data.platformCommissionInr >= 0
+        && data.supplierNetPayableInr is number && data.supplierNetPayableInr >= 0
+        && data.status in ['Pending', 'Settled']
+        && isOptionalString(data, 'referenceNumber', 120)
+        && isValidTimestamp(data.createdAt)
+        && isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPlatformSettings(data) {
+      return data.keys().hasAll(['commissionRatePct', 'gstRatePct', 'benchmarkAvgTransactionInr', 'benchmarkVariableCostPct', 'benchmarkVariableCostInr', 'monthlyFixedCostInr', 'manualOverrideEnabled', 'updatedAt', 'updatedBy'])
+        && data.keys().hasOnly(['commissionRatePct', 'gstRatePct', 'benchmarkAvgTransactionInr', 'benchmarkVariableCostPct', 'benchmarkVariableCostInr', 'monthlyFixedCostInr', 'manualOverrideEnabled', 'manualGold999Per10g', 'manualSilver999Per1kg', 'manualOverrideReason', 'updatedAt', 'updatedBy'])
+        && data.commissionRatePct is number && data.commissionRatePct >= 0 && data.commissionRatePct <= 10
+        && data.gstRatePct is number && data.gstRatePct >= 0 && data.gstRatePct <= 28
+        && data.benchmarkAvgTransactionInr is number && data.benchmarkAvgTransactionInr > 0
+        && data.benchmarkVariableCostPct is number && data.benchmarkVariableCostPct >= 0 && data.benchmarkVariableCostPct <= 100
+        && data.benchmarkVariableCostInr is number && data.benchmarkVariableCostInr >= 0
+        && data.monthlyFixedCostInr is number && data.monthlyFixedCostInr >= 0
+        && data.manualOverrideEnabled is bool
+        && isOptionalNumber(data, 'manualGold999Per10g')
+        && isOptionalNumber(data, 'manualSilver999Per1kg')
+        && isOptionalString(data, 'manualOverrideReason', 240)
+        && isValidTimestamp(data.updatedAt)
+        && isValidString(data.updatedBy, 1, 128);
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorEmail', 'actorRole', 'action', 'targetCollection', 'targetId', 'details', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'actorEmail', 'actorRole', 'action', 'targetCollection', 'targetId', 'details', 'createdAt'])
+        && isValidId(data.actorUid)
+        && data.actorUid == request.auth.uid
+        && isValidString(data.actorEmail, 3, 200)
+        && isValidString(data.actorRole, 2, 40)
+        && isValidString(data.action, 3, 100)
+        && isValidString(data.targetCollection, 2, 60)
+        && isValidId(data.targetId)
+        && isValidString(data.details, 2, 600)
+        && isValidTimestamp(data.createdAt);
+    }
+
+    // =========================================================================
+    // 1. USERS (Strict PII Isolation & Anti-Privilege-Escalation)
+    // =========================================================================
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (
+        (isSignedIn() && request.auth.uid == userId) || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isVerified() && isValidId(userId) && isValidUser(incoming())
+        && request.auth.uid == userId
+        && incoming().uid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (incoming().role in ['jeweller', 'supplier', 'supplier_staff']) ||
+          (incoming().role == 'super_admin' && isBootstrappedAdmin())
+        );
+      allow update: if isVerified() && isValidId(userId) && isValidUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            request.auth.uid == userId
+            && incoming().role == existing().role
+            && incoming().isActive == existing().isActive
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phone', 'supplierId', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 2. ADMINS (Trusted Super Admin Registry)
+    // =========================================================================
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && (
+        (isVerified() && request.auth.uid == adminId) || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin();
+      allow create: if isValidId(adminId) && isValidAdminDoc(incoming())
+        && isAdmin()
+        && incoming().uid == adminId
+        && incoming().createdAt == request.time;
+      allow update, delete: if isValidId(adminId) && isBootstrappedAdmin();
+    }
+
+    // =========================================================================
+    // 3. JEWELLER PROFILES (PII & KYC Isolated to Owner or Admin)
+    // =========================================================================
+    match /jeweller_profiles/{profileId} {
+      allow get: if isValidId(profileId) && (
+        (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && isValidId(profileId) && isValidJewellerProfile(incoming())
+        && profileId == request.auth.uid
+        && incoming().userId == request.auth.uid
+        && incoming().verificationStatus == 'Pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(profileId) && isValidJewellerProfile(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid
+            && incoming().verificationStatus == existing().verificationStatus
+            && incoming().diff(existing()).affectedKeys().hasOnly(['shopName', 'ownerName', 'gstin', 'pan', 'jaipurLocality', 'address', 'contactPhone', 'kycDocumentUrl', 'kycDocumentName', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 4. SUPPLIERS (Only Approved Suppliers Appear Publicly)
+    // =========================================================================
+    match /suppliers/{supplierId} {
+      allow get: if isValidId(supplierId) && (
+        resource.data.status == 'Approved'
+        || (isSignedIn() && resource.data.ownerUserId == request.auth.uid)
+        || isAdmin()
+      );
+      allow list: if resource.data.status == 'Approved'
+        || isBootstrappedAdmin()
+        || (isSignedIn() && resource.data.ownerUserId == request.auth.uid);
+      allow create: if isVerified() && isValidId(supplierId) && isValidSupplier(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().ratingAvg == 0
+        && incoming().reviewCount == 0
+        && incoming().completedOrdersCount == 0
+        && (
+          isAdmin() ||
+          (
+            incoming().ownerUserId == request.auth.uid
+            && incoming().status == 'Pending'
+          )
+        );
+      allow update: if isVerified() && isValidId(supplierId) && isValidSupplier(incoming())
+        && incoming().ownerUserId == existing().ownerUserId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().ownerUserId == request.auth.uid
+            && incoming().status == existing().status
+            && incoming().ratingAvg == existing().ratingAvg
+            && incoming().reviewCount == existing().reviewCount
+            && incoming().completedOrdersCount == existing().completedOrdersCount
+            && incoming().diff(existing()).affectedKeys().hasOnly(['businessName', 'gstin', 'bisLicenseNumber', 'assayingPartner', 'jaipurLocality', 'officeAddress', 'deliveryCenter', 'kycDocumentUrl', 'kycDocumentName', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 5. SUPPLIER STAFF (Verified Email Matching Only)
+    // =========================================================================
+    match /supplier_staff/{staffId} {
+      allow get: if isValidId(staffId) && (
+        (isSignedIn() && (resource.data.supplierOwnerId == request.auth.uid || resource.data.userId == request.auth.uid))
+        || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin() || (
+        isVerified() && (
+          resource.data.supplierOwnerId == request.auth.uid
+          || resource.data.userId == request.auth.uid
+          || resource.data.staffEmail == request.auth.token.email
+        )
+      );
+      allow create: if isVerified() && isValidId(staffId) && isValidSupplierStaff(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/suppliers/$(incoming().supplierId))
+        && (
+          isAdmin() ||
+          (
+            incoming().supplierOwnerId == request.auth.uid
+            && get(/databases/$(database)/documents/suppliers/$(incoming().supplierId)).data.ownerUserId == request.auth.uid
+          )
+        );
+      allow update: if isVerified() && isValidId(staffId) && isValidSupplierStaff(incoming())
+        && incoming().supplierId == existing().supplierId
+        && incoming().supplierOwnerId == existing().supplierOwnerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().supplierOwnerId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['staffName', 'designation', 'userId', 'canLockRates', 'canUploadPurityDocs', 'isActive', 'updatedAt'])
+          ) ||
+          (
+            existing().staffEmail == request.auth.token.email
+            && incoming().userId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['userId', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(staffId) && (isAdmin() || (isVerified() && existing().supplierOwnerId == request.auth.uid));
+    }
+
+    // =========================================================================
+    // 6. MARKET RATES (Admin Override Protected Against Non-Admin Overwrite)
+    // =========================================================================
+    match /market_rates/{rateId} {
+      allow get: if isValidId(rateId);
+      allow list: if resource.data.gold999Per10g > 0;
+      allow create: if isVerified() && isValidId(rateId) && isValidMarketRate(incoming())
+        && incoming().lastUpdatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            incoming().isManualOverride == false
+            && incoming().updatedBy == request.auth.uid
+          )
+        );
+      allow update: if isVerified() && isValidId(rateId) && isValidMarketRate(incoming())
+        && incoming().lastUpdatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().isManualOverride == false
+            && incoming().isManualOverride == false
+            && incoming().updatedBy == request.auth.uid
+          )
+        );
+      allow delete: if isValidId(rateId) && isAdmin();
+    }
+
+    // =========================================================================
+    // 7. BULLION LISTINGS (Only Approved Suppliers Visible Publicly)
+    // =========================================================================
+    match /bullion_listings/{listingId} {
+      allow get: if isValidId(listingId) && (
+        (resource.data.supplierApproved == true && resource.data.isActive == true)
+        || (isSignedIn() && resource.data.supplierOwnerId == request.auth.uid)
+        || isAdmin()
+      );
+      allow list: if (resource.data.supplierApproved == true && resource.data.isActive == true)
+        || isBootstrappedAdmin()
+        || (isSignedIn() && resource.data.supplierOwnerId == request.auth.uid);
+      allow create: if isVerified() && isValidId(listingId) && isValidBullionListing(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/suppliers/$(incoming().supplierId))
+        && (
+          isAdmin() ||
+          (
+            incoming().supplierOwnerId == request.auth.uid
+            && get(/databases/$(database)/documents/suppliers/$(incoming().supplierId)).data.ownerUserId == request.auth.uid
+            && incoming().supplierApproved == (get(/databases/$(database)/documents/suppliers/$(incoming().supplierId)).data.status == 'Approved')
+          )
+        );
+      allow update: if isVerified() && isValidId(listingId) && isValidBullionListing(incoming())
+        && incoming().supplierId == existing().supplierId
+        && incoming().supplierOwnerId == existing().supplierOwnerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().supplierOwnerId == request.auth.uid
+            && incoming().supplierApproved == (get(/databases/$(database)/documents/suppliers/$(existing().supplierId)).data.status == 'Approved')
+            && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'form', 'unitGrams', 'minWeightGrams', 'maxWeightGrams', 'availableStockGrams', 'premiumPerUnitInr', 'deliveryCenter', 'supportsBuy', 'supportsSell', 'supportsExchange', 'isActive', 'supplierApproved', 'updatedAt'])
+          )
+        );
+      allow delete: if isValidId(listingId) && (isAdmin() || (isVerified() && existing().supplierOwnerId == request.auth.uid));
+    }
+
+    // =========================================================================
+    // 8. ORDERS (Dynamic-Until-Confirmed, Action-Based Updates, Commission Lock)
+    // =========================================================================
+    function isOrderParticipant(data) {
+      return isSignedIn() && (
+        data.jewellerId == request.auth.uid
+        || data.supplierOwnerId == request.auth.uid
+        || (request.auth.uid in data.assignedStaffUids)
+      );
+    }
+
+    function isSupplierActor(data) {
+      return isVerified() && (
+        data.supplierOwnerId == request.auth.uid
+        || (request.auth.uid in data.assignedStaffUids)
+      );
+    }
+
+    function isTerminalOrderStatus(status) {
+      return status in ['Completed', 'Cancelled', 'Rejected'];
+    }
+
+    function expectedCommissionPct() {
+      return exists(/databases/$(database)/documents/platform_settings/config)
+        ? get(/databases/$(database)/documents/platform_settings/config).data.commissionRatePct
+        : 1.25;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && (isOrderParticipant(resource.data) || isAdmin());
+      allow list: if isBootstrappedAdmin() || isOrderParticipant(resource.data);
+      allow create: if isVerified() && isValidId(orderId) && isValidOrder(incoming())
+        && incoming().jewellerId == request.auth.uid
+        && incoming().status == 'Quote Requested'
+        && incoming().isRateLocked == false
+        && incoming().hasInvoice == false
+        && incoming().hasReview == false
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().platformCommissionRatePct == expectedCommissionPct()
+        && exists(/databases/$(database)/documents/suppliers/$(incoming().supplierId))
+        && get(/databases/$(database)/documents/suppliers/$(incoming().supplierId)).data.status == 'Approved'
+        && exists(/databases/$(database)/documents/bullion_listings/$(incoming().listingId));
+
+      allow update: if isVerified() && isValidId(orderId) && isValidOrder(incoming())
+        && incoming().orderNumber == existing().orderNumber
+        && incoming().idempotencyKey == existing().idempotencyKey
+        && incoming().jewellerId == existing().jewellerId
+        && incoming().supplierId == existing().supplierId
+        && incoming().supplierOwnerId == existing().supplierOwnerId
+        && incoming().listingId == existing().listingId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            !isTerminalOrderStatus(existing().status) && (
+              // Action 1: Supplier confirms & locks live MCX rate (commission % strictly immutable)
+              (
+                isSupplierActor(existing())
+                && existing().status == 'Quote Requested'
+                && incoming().status == 'Quote Confirmed & Rate Locked'
+                && incoming().isRateLocked == true
+                && incoming().lockedMcxBaseRatePerUnit > 0
+                && incoming().grossBullionValueInr > 0
+                && incoming().platformCommissionInr >= 0
+                && incoming().finalPayableTotalInr > 0
+                && incoming().rateLockedAt == request.time
+                && incoming().rateLockedByUid == request.auth.uid
+                && incoming().platformCommissionRatePct == existing().platformCommissionRatePct
+                && incoming().platformCommissionRatePct == expectedCommissionPct()
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'isRateLocked', 'lockedMcxBaseRatePerUnit', 'baseMetalValueInr', 'supplierPremiumTotalInr', 'grossBullionValueInr', 'platformCommissionInr', 'gstAmountInr', 'finalPayableTotalInr', 'rateLockedAt', 'rateLockedByUid', 'updatedAt'])
+              ) ||
+              // Action 2: Supplier rejects quote request
+              (
+                isSupplierActor(existing())
+                && existing().status == 'Quote Requested'
+                && incoming().status == 'Rejected'
+                && incoming().isRateLocked == false
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'updatedAt'])
+              ) ||
+              // Action 3: Supplier uploads purity & assaying documents
+              (
+                isSupplierActor(existing())
+                && existing().status == 'Quote Confirmed & Rate Locked'
+                && incoming().status == 'Purity & Docs Uploaded'
+                && incoming().isRateLocked == true
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+              ) ||
+              // Action 4: Jeweller approves locked rate & purity docs
+              (
+                existing().jewellerId == request.auth.uid
+                && existing().status == 'Purity & Docs Uploaded'
+                && incoming().status == 'Order Approved by Jeweller'
+                && incoming().isRateLocked == true
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+              ) ||
+              // Action 5: Jeweller or Supplier records manual payment / exchange settlement
+              (
+                (existing().jewellerId == request.auth.uid || isSupplierActor(existing()))
+                && existing().status == 'Order Approved by Jeweller'
+                && incoming().status == 'Payment / Exchange Settled'
+                && incoming().isRateLocked == true
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'settlementMethod', 'settlementReference', 'updatedAt'])
+              ) ||
+              // Action 6: Supplier marks ready for pickup / dispatch or completed
+              (
+                isSupplierActor(existing())
+                && (
+                  (existing().status == 'Payment / Exchange Settled' && incoming().status == 'Ready for Pickup / Dispatch') ||
+                  (existing().status == 'Ready for Pickup / Dispatch' && incoming().status == 'Completed')
+                )
+                && incoming().isRateLocked == true
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+              ) ||
+              // Action 7: Supplier marks invoice generated atomically with invoice doc
+              (
+                isSupplierActor(existing())
+                && existing().isRateLocked == true
+                && existing().hasInvoice == false
+                && incoming().hasInvoice == true
+                && existsAfter(/databases/$(database)/documents/invoices/$(orderId))
+                && incoming().diff(existing()).affectedKeys().hasOnly(['hasInvoice', 'updatedAt'])
+              ) ||
+              // Action 8: Jeweller cancels before settlement
+              (
+                existing().jewellerId == request.auth.uid
+                && existing().status in ['Quote Requested', 'Quote Confirmed & Rate Locked', 'Purity & Docs Uploaded']
+                && incoming().status == 'Cancelled'
+                && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'rejectionReason', 'updatedAt'])
+              )
+            )
+          ) ||
+          // Action 9: Jeweller marks hasReview = true atomically on Completed order
+          (
+            existing().jewellerId == request.auth.uid
+            && existing().status == 'Completed'
+            && existing().hasReview == false
+            && incoming().hasReview == true
+            && existsAfter(/databases/$(database)/documents/reviews/$(orderId))
+            && incoming().diff(existing()).affectedKeys().hasOnly(['hasReview', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 9. ORDER STATUS HISTORY (Immutable Append-Only Audit Trail)
+    // =========================================================================
+    match /order_status_history/{historyId} {
+      allow get: if isValidId(historyId) && (isOrderParticipant(resource.data) || isAdmin());
+      allow list: if isBootstrappedAdmin() || isOrderParticipant(resource.data);
+      allow create: if isVerified() && isValidId(historyId) && isValidOrderStatusHistory(incoming())
+        && incoming().createdAt == request.time
+        && existsAfter(/databases/$(database)/documents/orders/$(incoming().orderId))
+        && (isOrderParticipant(incoming()) || isAdmin());
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // 10. PURITY DOCUMENTS (Assaying & XRF Certificates)
+    // =========================================================================
+    match /purity_documents/{docId} {
+      allow get: if isValidId(docId) && (isOrderParticipant(resource.data) || isAdmin());
+      allow list: if isBootstrappedAdmin() || isOrderParticipant(resource.data);
+      allow create: if isVerified() && isValidId(docId) && isValidPurityDocument(incoming())
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/orders/$(incoming().orderId))
+        && (isSupplierActor(incoming()) || isAdmin());
+      allow update, delete: if isValidId(docId) && isAdmin();
+    }
+
+    // =========================================================================
+    // 11. INVOICES (Unique per Order ID — Prevents Duplicate Invoicing)
+    // =========================================================================
+    match /invoices/{invoiceId} {
+      allow get: if isValidId(invoiceId) && (isOrderParticipant(resource.data) || isAdmin());
+      allow list: if isBootstrappedAdmin() || isOrderParticipant(resource.data);
+      allow create: if isVerified() && isValidId(invoiceId) && isValidInvoice(incoming())
+        && invoiceId == incoming().orderId
+        && incoming().issuedAt == request.time
+        && exists(/databases/$(database)/documents/orders/$(incoming().orderId))
+        && get(/databases/$(database)/documents/orders/$(incoming().orderId)).data.isRateLocked == true
+        && (isSupplierActor(incoming()) || isAdmin());
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // 12. REVIEWS (Verified Reviews Strictly After Order Completed)
+    // =========================================================================
+    match /reviews/{reviewId} {
+      allow get: if isValidId(reviewId);
+      allow list: if resource.data.rating >= 1;
+      allow create: if isVerified() && isValidId(reviewId) && isValidReview(incoming())
+        && reviewId == incoming().orderId
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/orders/$(incoming().orderId))
+        && get(/databases/$(database)/documents/orders/$(incoming().orderId)).data.jewellerId == request.auth.uid
+        && get(/databases/$(database)/documents/orders/$(incoming().orderId)).data.status == 'Completed';
+      allow update, delete: if isValidId(reviewId) && isAdmin();
+    }
+
+    // =========================================================================
+    // 13. NOTIFICATIONS (User-Scoped Inbox)
+    // =========================================================================
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && (
+        (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isVerified() && isValidId(notificationId) && isValidNotification(incoming())
+        && incoming().senderUid == request.auth.uid
+        && incoming().isRead == false
+        && incoming().createdAt == request.time;
+      allow update: if isVerified() && isValidId(notificationId) && isValidNotification(incoming())
+        && incoming().userId == existing().userId
+        && incoming().senderUid == existing().senderUid
+        && incoming().createdAt == existing().createdAt
+        && (
+          isAdmin() ||
+          (
+            existing().userId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['isRead'])
+          )
+        );
+      allow delete: if isValidId(notificationId) && (isAdmin() || (isVerified() && existing().userId == request.auth.uid));
+    }
+
+    // =========================================================================
+    // 14. SUPPORT TICKETS
+    // =========================================================================
+    match /support_tickets/{ticketId} {
+      allow get: if isValidId(ticketId) && (
+        (isSignedIn() && resource.data.createdByUid == request.auth.uid) || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.createdByUid == request.auth.uid);
+      allow create: if isVerified() && isValidId(ticketId) && isValidSupportTicket(incoming())
+        && incoming().createdByUid == request.auth.uid
+        && incoming().status == 'Open'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(ticketId) && isValidSupportTicket(incoming())
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().ticketNumber == existing().ticketNumber
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (
+            existing().createdByUid == request.auth.uid
+            && existing().status != 'Closed'
+            && incoming().status in ['Open', 'Closed']
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 15. SUPPORT MESSAGES (Admin Internal Notes Strictly Isolated)
+    // =========================================================================
+    match /support_messages/{messageId} {
+      allow get: if isValidId(messageId) && (
+        isAdmin() ||
+        (isSignedIn() && resource.data.ticketOwnerId == request.auth.uid && resource.data.isInternalNote == false)
+      );
+      allow list: if isBootstrappedAdmin() || (
+        isSignedIn() && resource.data.ticketOwnerId == request.auth.uid && resource.data.isInternalNote == false
+      );
+      allow create: if isVerified() && isValidId(messageId) && isValidSupportMessage(incoming())
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/support_tickets/$(incoming().ticketId))
+        && (
+          isAdmin() ||
+          (
+            incoming().isInternalNote == false
+            && incoming().ticketOwnerId == request.auth.uid
+            && get(/databases/$(database)/documents/support_tickets/$(incoming().ticketId)).data.createdByUid == request.auth.uid
+          )
+        );
+      allow update, delete: if false;
+    }
+
+    // =========================================================================
+    // 16. SETTLEMENTS (Supplier Earnings & Commission Ledger)
+    // =========================================================================
+    match /settlements/{settlementId} {
+      allow get: if isValidId(settlementId) && (
+        (isSignedIn() && resource.data.supplierOwnerId == request.auth.uid) || isAdmin()
+      );
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && resource.data.supplierOwnerId == request.auth.uid);
+      allow create: if isVerified() && isValidId(settlementId) && isValidSettlement(incoming())
+        && settlementId == incoming().orderId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/orders/$(incoming().orderId))
+        && get(/databases/$(database)/documents/orders/$(incoming().orderId)).data.isRateLocked == true
+        && (
+          isAdmin() ||
+          (
+            incoming().supplierOwnerId == request.auth.uid
+            && incoming().status == 'Pending'
+          )
+        );
+      allow update: if isVerified() && isValidId(settlementId) && isValidSettlement(incoming())
+        && incoming().orderId == existing().orderId
+        && incoming().supplierId == existing().supplierId
+        && incoming().supplierOwnerId == existing().supplierOwnerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && isAdmin();
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 17. PLATFORM SETTINGS (Super Admin Only Write; Public Read for Pricing)
+    // =========================================================================
+    match /platform_settings/{settingId} {
+      allow get: if isValidId(settingId) && settingId == 'config';
+      allow list: if isBootstrappedAdmin();
+      allow create, update: if isValidId(settingId) && settingId == 'config'
+        && isAdmin()
+        && isValidPlatformSettings(incoming())
+        && incoming().updatedAt == request.time;
+      allow delete: if false;
+    }
+
+    // =========================================================================
+    // 18. AUDIT LOGS (Immutable Append-Only Governance Trail)
+    // =========================================================================
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isBootstrappedAdmin();
+      allow create: if isVerified() && isValidId(logId) && isValidAuditLog(incoming())
+        && incoming().createdAt == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

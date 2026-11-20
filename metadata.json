@@ -1,0 +1,6 @@
+{
+  "name": "BullionBridge",
+  "description": "Verified Bullion. Live MCX-Linked Pricing. Trusted Transactions. Jaipur B2B Digital Bullion Sourcing & Exchange Marketplace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

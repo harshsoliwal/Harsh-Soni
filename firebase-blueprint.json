@@ -1,0 +1,497 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Private user account record with role and contact PII.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 24 },
+        "role": { "type": "string", "enum": ["jeweller", "supplier", "supplier_staff", "super_admin"] },
+        "supplierId": { "type": "string", "maxLength": 128 },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "isActive", "createdAt", "updatedAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Trusted Super Admin membership record.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 200 },
+        "grantedBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "grantedBy", "createdAt"]
+    },
+    "JewellerProfile": {
+      "title": "JewellerProfile",
+      "description": "Business KYC and trade profile for a Jaipur retail or wholesale jeweller.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "shopName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "ownerName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "gstin": { "type": "string", "maxLength": 20 },
+        "pan": { "type": "string", "maxLength": 16 },
+        "jaipurLocality": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "address": { "type": "string", "maxLength": 300 },
+        "contactPhone": { "type": "string", "maxLength": 24 },
+        "kycDocumentUrl": { "type": "string", "maxLength": 600 },
+        "kycDocumentName": { "type": "string", "maxLength": 160 },
+        "verificationStatus": { "type": "string", "enum": ["Pending", "Under Review", "Approved", "Rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "shopName", "ownerName", "gstin", "jaipurLocality", "verificationStatus", "createdAt", "updatedAt"]
+    },
+    "Supplier": {
+      "title": "Supplier",
+      "description": "Verified bullion dealer, wholesaler, or refiner operating in Jaipur.",
+      "type": "object",
+      "properties": {
+        "ownerUserId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "businessName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "gstin": { "type": "string", "maxLength": 20 },
+        "bisLicenseNumber": { "type": "string", "maxLength": 80 },
+        "assayingPartner": { "type": "string", "maxLength": 140 },
+        "jaipurLocality": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "officeAddress": { "type": "string", "maxLength": 300 },
+        "deliveryCenter": { "type": "string", "maxLength": 200 },
+        "kycDocumentUrl": { "type": "string", "maxLength": 600 },
+        "kycDocumentName": { "type": "string", "maxLength": 160 },
+        "status": { "type": "string", "enum": ["Pending", "Under Review", "Approved", "Rejected", "Suspended"] },
+        "adminRemarks": { "type": "string", "maxLength": 400 },
+        "ratingAvg": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "completedOrdersCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUserId", "businessName", "gstin", "bisLicenseNumber", "jaipurLocality", "officeAddress", "deliveryCenter", "status", "ratingAvg", "reviewCount", "completedOrdersCount", "createdAt", "updatedAt"]
+    },
+    "SupplierStaff": {
+      "title": "SupplierStaff",
+      "description": "Authorized staff member assigned strictly to a single bullion supplier.",
+      "type": "object",
+      "properties": {
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "staffEmail": { "type": "string", "format": "email", "maxLength": 200 },
+        "staffName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "designation": { "type": "string", "maxLength": 80 },
+        "canLockRates": { "type": "boolean" },
+        "canUploadPurityDocs": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["supplierId", "supplierOwnerId", "staffEmail", "staffName", "canLockRates", "canUploadPurityDocs", "isActive", "createdAt", "updatedAt"]
+    },
+    "MarketRate": {
+      "title": "MarketRate",
+      "description": "Live cached or admin-overridden MCX Gold and Silver reference rates.",
+      "type": "object",
+      "properties": {
+        "gold999Per10g": { "type": "number" },
+        "gold995Per10g": { "type": "number" },
+        "gold999Per1g": { "type": "number" },
+        "silver999Per1kg": { "type": "number" },
+        "silver999Per100g": { "type": "number" },
+        "usdInr": { "type": "number" },
+        "xauUsd": { "type": "number" },
+        "xagUsd": { "type": "number" },
+        "source": { "type": "string", "maxLength": 120 },
+        "isDelayed": { "type": "boolean" },
+        "isManualOverride": { "type": "boolean" },
+        "manualOverrideNote": { "type": "string", "maxLength": 240 },
+        "lastUpdatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["gold999Per10g", "gold995Per10g", "gold999Per1g", "silver999Per1kg", "silver999Per100g", "source", "isDelayed", "isManualOverride", "lastUpdatedAt", "updatedBy"]
+    },
+    "BullionListing": {
+      "title": "BullionListing",
+      "description": "Supplier gold or silver bullion offering priced as MCX base plus supplier premium.",
+      "type": "object",
+      "properties": {
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "supplierApproved": { "type": "boolean" },
+        "metal": { "type": "string", "enum": ["GOLD", "SILVER"] },
+        "purity": { "type": "string", "enum": ["999", "995"] },
+        "form": { "type": "string", "enum": ["Bar", "Coin", "Biscuit", "Kacha"] },
+        "title": { "type": "string", "minLength": 3, "maxLength": 140 },
+        "unitGrams": { "type": "number" },
+        "minWeightGrams": { "type": "number" },
+        "maxWeightGrams": { "type": "number" },
+        "availableStockGrams": { "type": "number" },
+        "premiumPerUnitInr": { "type": "number" },
+        "jaipurLocality": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "deliveryCenter": { "type": "string", "maxLength": 200 },
+        "supportsBuy": { "type": "boolean" },
+        "supportsSell": { "type": "boolean" },
+        "supportsExchange": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["supplierId", "supplierOwnerId", "supplierName", "supplierApproved", "metal", "purity", "form", "title", "unitGrams", "minWeightGrams", "maxWeightGrams", "availableStockGrams", "premiumPerUnitInr", "jaipurLocality", "deliveryCenter", "supportsBuy", "supportsSell", "supportsExchange", "isActive", "createdAt", "updatedAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Dynamic-until-confirmed bullion order with immutable locked price snapshot on supplier confirmation.",
+      "type": "object",
+      "properties": {
+        "orderNumber": { "type": "string", "minLength": 6, "maxLength": 40 },
+        "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerShopName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "listingId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignedStaffUids": { "type": "array" },
+        "orderType": { "type": "string", "enum": ["BUY", "SELL", "EXCHANGE"] },
+        "metal": { "type": "string", "enum": ["GOLD", "SILVER"] },
+        "purity": { "type": "string", "enum": ["999", "995"] },
+        "weightGrams": { "type": "number" },
+        "deliveryCenter": { "type": "string", "maxLength": 200 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Quote Requested",
+            "Quote Confirmed & Rate Locked",
+            "Rejected",
+            "Purity & Docs Uploaded",
+            "Order Approved by Jeweller",
+            "Payment / Exchange Settled",
+            "Ready for Pickup / Dispatch",
+            "Completed",
+            "Cancelled"
+          ]
+        },
+        "isRateLocked": { "type": "boolean" },
+        "indicativeMcxRatePerUnit": { "type": "number" },
+        "supplierPremiumPerUnitInr": { "type": "number" },
+        "platformCommissionRatePct": { "type": "number" },
+        "gstRatePct": { "type": "number" },
+        "lockedMcxBaseRatePerUnit": { "type": "number" },
+        "baseMetalValueInr": { "type": "number" },
+        "supplierPremiumTotalInr": { "type": "number" },
+        "grossBullionValueInr": { "type": "number" },
+        "platformCommissionInr": { "type": "number" },
+        "gstAmountInr": { "type": "number" },
+        "finalPayableTotalInr": { "type": "number" },
+        "rateLockedAt": { "type": "string", "format": "date-time" },
+        "rateLockedByUid": { "type": "string", "maxLength": 128 },
+        "settlementMethod": { "type": "string", "maxLength": 60 },
+        "settlementReference": { "type": "string", "maxLength": 120 },
+        "rejectionReason": { "type": "string", "maxLength": 300 },
+        "hasInvoice": { "type": "boolean" },
+        "hasReview": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "orderNumber",
+        "idempotencyKey",
+        "jewellerId",
+        "jewellerShopName",
+        "supplierId",
+        "supplierOwnerId",
+        "supplierName",
+        "listingId",
+        "assignedStaffUids",
+        "orderType",
+        "metal",
+        "purity",
+        "weightGrams",
+        "deliveryCenter",
+        "status",
+        "isRateLocked",
+        "indicativeMcxRatePerUnit",
+        "supplierPremiumPerUnitInr",
+        "platformCommissionRatePct",
+        "gstRatePct",
+        "hasInvoice",
+        "hasReview",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OrderStatusHistory": {
+      "title": "OrderStatusHistory",
+      "description": "Immutable append-only status timeline entry for an order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignedStaffUids": { "type": "array" },
+        "fromStatus": { "type": "string", "maxLength": 60 },
+        "toStatus": { "type": "string", "maxLength": 60 },
+        "changedByUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "changedByRole": { "type": "string", "maxLength": 40 },
+        "note": { "type": "string", "maxLength": 400 },
+        "priceSnapshotInr": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "jewellerId", "supplierOwnerId", "assignedStaffUids", "fromStatus", "toStatus", "changedByUid", "changedByRole", "note", "createdAt"]
+    },
+    "PurityDocument": {
+      "title": "PurityDocument",
+      "description": "Assaying or XRF purity certificate attached to an order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignedStaffUids": { "type": "array" },
+        "certificateNumber": { "type": "string", "minLength": 3, "maxLength": 80 },
+        "assayingLab": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "testedPurity": { "type": "string", "minLength": 2, "maxLength": 40 },
+        "grossWeightGrams": { "type": "number" },
+        "netWeightGrams": { "type": "number" },
+        "fileUrl": { "type": "string", "maxLength": 600 },
+        "fileName": { "type": "string", "maxLength": 160 },
+        "uploadedByUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "jewellerId", "supplierId", "supplierOwnerId", "assignedStaffUids", "certificateNumber", "assayingLab", "testedPurity", "grossWeightGrams", "netWeightGrams", "fileName", "uploadedByUid", "createdAt"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "Immutable GST tax invoice generated once per locked order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "invoiceNumber": { "type": "string", "minLength": 6, "maxLength": 50 },
+        "jewellerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerShopName": { "type": "string", "maxLength": 140 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierName": { "type": "string", "maxLength": 140 },
+        "assignedStaffUids": { "type": "array" },
+        "metal": { "type": "string", "enum": ["GOLD", "SILVER"] },
+        "purity": { "type": "string", "enum": ["999", "995"] },
+        "weightGrams": { "type": "number" },
+        "grossBullionValueInr": { "type": "number" },
+        "platformCommissionRatePct": { "type": "number" },
+        "platformCommissionInr": { "type": "number" },
+        "gstRatePct": { "type": "number" },
+        "gstAmountInr": { "type": "number" },
+        "finalPayableTotalInr": { "type": "number" },
+        "issuedByUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "issuedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "invoiceNumber", "jewellerId", "jewellerShopName", "supplierId", "supplierOwnerId", "supplierName", "assignedStaffUids", "metal", "purity", "weightGrams", "grossBullionValueInr", "platformCommissionRatePct", "platformCommissionInr", "gstRatePct", "gstAmountInr", "finalPayableTotalInr", "issuedByUid", "issuedAt"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Verified jeweller review linked strictly to a completed order.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "jewellerShopName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string", "minLength": 4, "maxLength": 600 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "jewellerId", "jewellerShopName", "supplierId", "rating", "comment", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User-targeted workflow and verification notification.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "message": { "type": "string", "minLength": 2, "maxLength": 400 },
+        "category": { "type": "string", "enum": ["ORDER", "RATE_LOCK", "VERIFICATION", "SUPPORT", "SETTLEMENT"] },
+        "relatedOrderId": { "type": "string", "maxLength": 128 },
+        "isRead": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "senderUid", "title", "message", "category", "isRead", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Support desk ticket raised by a jeweller or bullion supplier.",
+      "type": "object",
+      "properties": {
+        "ticketNumber": { "type": "string", "minLength": 5, "maxLength": 40 },
+        "createdByUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdByName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "createdByRole": { "type": "string", "maxLength": 40 },
+        "subject": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "category": { "type": "string", "enum": ["Order Issue", "Purity Dispute", "KYC / Verification", "Settlement / Invoice", "General"] },
+        "priority": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Resolved", "Closed"] },
+        "relatedOrderId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ticketNumber", "createdByUid", "createdByName", "createdByRole", "subject", "category", "priority", "status", "createdAt", "updatedAt"]
+    },
+    "SupportMessage": {
+      "title": "SupportMessage",
+      "description": "Support ticket message or admin-only private internal note.",
+      "type": "object",
+      "properties": {
+        "ticketId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "ticketOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "senderRole": { "type": "string", "maxLength": 40 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 1500 },
+        "isInternalNote": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ticketId", "ticketOwnerId", "senderUid", "senderName", "senderRole", "body", "isInternalNote", "createdAt"]
+    },
+    "Settlement": {
+      "title": "Settlement",
+      "description": "Supplier settlement ledger tracking GTV, platform commission, and supplier net payout.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "orderNumber": { "type": "string", "maxLength": 40 },
+        "supplierId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierOwnerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "supplierName": { "type": "string", "maxLength": 140 },
+        "grossTransactionValueInr": { "type": "number" },
+        "platformCommissionRatePct": { "type": "number" },
+        "platformCommissionInr": { "type": "number" },
+        "supplierNetPayableInr": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Settled"] },
+        "referenceNumber": { "type": "string", "maxLength": 120 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "orderNumber", "supplierId", "supplierOwnerId", "supplierName", "grossTransactionValueInr", "platformCommissionRatePct", "platformCommissionInr", "supplierNetPayableInr", "status", "createdAt", "updatedAt"]
+    },
+    "PlatformSettings": {
+      "title": "PlatformSettings",
+      "description": "Super Admin configurable commission, GST, venture plan benchmarks, and MCX manual override settings.",
+      "type": "object",
+      "properties": {
+        "commissionRatePct": { "type": "number" },
+        "gstRatePct": { "type": "number" },
+        "benchmarkAvgTransactionInr": { "type": "number" },
+        "benchmarkVariableCostPct": { "type": "number" },
+        "benchmarkVariableCostInr": { "type": "number" },
+        "monthlyFixedCostInr": { "type": "number" },
+        "manualOverrideEnabled": { "type": "boolean" },
+        "manualGold999Per10g": { "type": "number" },
+        "manualSilver999Per1kg": { "type": "number" },
+        "manualOverrideReason": { "type": "string", "maxLength": 240 },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["commissionRatePct", "gstRatePct", "benchmarkAvgTransactionInr", "benchmarkVariableCostPct", "benchmarkVariableCostInr", "monthlyFixedCostInr", "manualOverrideEnabled", "updatedAt", "updatedBy"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable platform audit log for governance and compliance.",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorEmail": { "type": "string", "maxLength": 200 },
+        "actorRole": { "type": "string", "maxLength": 40 },
+        "action": { "type": "string", "minLength": 3, "maxLength": 100 },
+        "targetCollection": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "details": { "type": "string", "maxLength": 600 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorEmail", "actorRole", "action", "targetCollection", "targetId", "details", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User accounts and role records with owner/admin-only PII access."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Trusted Super Admin registry."
+    },
+    "/jeweller_profiles/{profileId}": {
+      "schema": { "$ref": "#/entities/JewellerProfile" },
+      "description": "Jaipur jeweller shop profiles, GSTIN, PAN, and KYC uploads."
+    },
+    "/suppliers/{supplierId}": {
+      "schema": { "$ref": "#/entities/Supplier" },
+      "description": "Bullion suppliers with approval status; only Approved suppliers are publicly visible."
+    },
+    "/supplier_staff/{staffId}": {
+      "schema": { "$ref": "#/entities/SupplierStaff" },
+      "description": "Staff authorized for a specific supplier."
+    },
+    "/market_rates/{rateId}": {
+      "schema": { "$ref": "#/entities/MarketRate" },
+      "description": "Cached live MCX Gold & Silver rates and manual override references."
+    },
+    "/bullion_listings/{listingId}": {
+      "schema": { "$ref": "#/entities/BullionListing" },
+      "description": "Live MCX-linked gold and silver bullion listings by verified suppliers."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Dynamic-until-confirmed bullion buy, sell, and exchange orders."
+    },
+    "/order_status_history/{historyId}": {
+      "schema": { "$ref": "#/entities/OrderStatusHistory" },
+      "description": "Immutable append-only order status history entries."
+    },
+    "/purity_documents/{docId}": {
+      "schema": { "$ref": "#/entities/PurityDocument" },
+      "description": "Purity and assaying certificates attached to orders."
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "Unique tax invoices keyed by orderId to prevent duplicate invoicing."
+    },
+    "/reviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/Review" },
+      "description": "Verified reviews linked to completed orders."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Targeted user workflow notifications."
+    },
+    "/support_tickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Support tickets raised by jewellers or suppliers."
+    },
+    "/support_messages/{messageId}": {
+      "schema": { "$ref": "#/entities/SupportMessage" },
+      "description": "Support ticket threads including admin-only private internal notes."
+    },
+    "/settlements/{settlementId}": {
+      "schema": { "$ref": "#/entities/Settlement" },
+      "description": "Supplier settlement and platform commission ledgers."
+    },
+    "/platform_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/PlatformSettings" },
+      "description": "Platform commission rate, venture financial model benchmarks, and MCX manual override config."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable platform audit trail."
+    }
+  }
+}
